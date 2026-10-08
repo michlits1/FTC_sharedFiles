@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team 38148 | Results May Vary | Auto Planner</title>
+<!-- Optional: the planner's fonts. Without this line it uses the site's fallback fonts. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- 1. The planner's styles. Every rule is scoped under .bbp, so your site's styles are untouched. -->
+<link rel="stylesheet" href="../dist/biobuzz-planner.css">
+<style>
+  /* Stand-in for your own site's styles */
+  body { margin: 0; font-family: Georgia, serif; background: #fff; color: #222; }
+  header.site { background: #111; color: #fff; padding: 16px 24px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+</style>
+</head>
+<body>
+<header class="site"><strong>Results May Vary</strong> &middot; FTC Team 38148</header>
+<main>
+  <h2>Plan your AUTO</h2>
+  <p>Plan on engineering paper first, then test it here.</p>
+
+  <!-- 2. Where the planner goes -->
+  <div id="auto-planner"></div>
+</main>
+
+<!-- 3. The planner's code, then one line to start it -->
+<script src="../dist/biobuzz-planner.js"></script>
+<script>
+  BiobuzzPlanner.mount('#auto-planner', {
+    title: 'RMV Auto Planner',
+    storageKey: 'rmv-38148-planner',            // keeps this planner's saved routes separate
+    robot: { tile: 0.9, turn: 0.5, intake: 1.2, launch: 0.4 },  // your robot's measured times
+    assumptions: { firstTip: 4, nextTip: 8, capacity: 4 },
+    flowers: [['A2', 'A3'], ['B6', 'C6'], ['F4', 'F5'], ['D1', 'E1']]  // fix these once checked against Figure 9-2
+  });
+</script>
+</body>
+</html>

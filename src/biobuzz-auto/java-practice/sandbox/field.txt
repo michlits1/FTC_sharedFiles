@@ -1,0 +1,19 @@
+; THE FIELD. You can edit this file and rerun. Lines starting with ; are ignored.
+;
+;   #  wall                      .  open floor
+;   S  robot start (faces East)  C  a piece of cargo on the floor
+;   Z  low scoring zone          H  high scoring zone
+;   P  parking zone
+;
+; Rows go top to bottom. North is up. The top-left floor tile is x=1, y=1.
+; Every row must be the same width and there must be exactly one S.
+;
+##########
+#S...#..H#
+#....#..H#
+#.C..#...#
+#........#
+#..C.#.C.#
+#....#...#
+#ZZ..#PP.#
+##########

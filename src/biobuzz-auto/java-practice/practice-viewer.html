@@ -1,0 +1,587 @@
+<title>Autonomous Sandbox</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout concept: a drafting sheet. A title block on top, two working tabs (Plan, Replay),
+   and one shared field drawing with coordinate rulers along its edges. */
+:root {
+  --paper: #ECEFEC;
+  --card: #F8FAF8;
+  --ink: #16222B;
+  --muted: #55646E;
+  --line: #C6D0CC;
+  --accent: #0C6B64;
+  --on-accent: #FFFFFF;
+  --amber: #8F5C0A;
+  --amber-bg: #F3E6C9;
+  --good: #1E7A3C;
+  --good-bg: #DCEFE2;
+  --bad: #A8322A;
+  --bad-bg: #F5DDD9;
+  --floor: #F8FAF8;
+  --wall: #2B3A44;
+  --zlow: #CFE6E3;
+  --zhigh: #F0D9A8;
+  --zpark: #D5DCEB;
+  --cargo: #C9871A;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0D1519; --card: #142027; --ink: #E2EBE7; --muted: #8DA09A; --line: #263740;
+    --accent: #45C4B7; --on-accent: #07201D; --amber: #E6B04A; --amber-bg: #3A2D10;
+    --good: #55C47F; --good-bg: #123322; --bad: #F2796E; --bad-bg: #3B1814;
+    --floor: #1A2A32; --wall: #070C0F; --zlow: #164A47; --zhigh: #5A4313; --zpark: #26334F; --cargo: #E6B04A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0D1519; --card: #142027; --ink: #E2EBE7; --muted: #8DA09A; --line: #263740;
+  --accent: #45C4B7; --on-accent: #07201D; --amber: #E6B04A; --amber-bg: #3A2D10;
+  --good: #55C47F; --good-bg: #123322; --bad: #F2796E; --bad-bg: #3B1814;
+  --floor: #1A2A32; --wall: #070C0F; --zlow: #164A47; --zhigh: #5A4313; --zpark: #26334F; --cargo: #E6B04A;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 1040px; margin-inline: auto; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-size: 24px; }
+h3 { font-size: 19px; }
+p { margin: 0; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--muted); }
+
+.titleblock { display: grid; grid-template-columns: 1fr auto; gap: 8px 24px; padding-block: 20px 14px; border-bottom: 2px solid var(--ink); align-items: end; }
+.titleblock h1 { font-size: clamp(30px, 6vw, 44px); }
+.titleblock .sub { color: var(--muted); font-size: 14px; max-width: 60ch; }
+.tb-stats { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+.tb-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tb-stat b { font-family: var(--font-display); font-size: 24px; line-height: 1; }
+@media (max-width: 640px) { .titleblock { grid-template-columns: 1fr; } .tb-stats { justify-content: flex-start; } }
+
+.bar-row { display: flex; gap: 12px 16px; flex-wrap: wrap; align-items: center; padding-block: 12px; border-bottom: 1px solid var(--line); }
+.filebtn { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paper); padding: 7px 14px; font-weight: 600; cursor: pointer; }
+.filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.source { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.source .pill { margin-right: 6px; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--line); color: var(--muted); }
+.pill.demo { background: var(--amber-bg); color: var(--amber); border-color: transparent; }
+.pill.live { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.msg { color: var(--bad); font-size: 14px; }
+
+nav.tabs { display: flex; gap: 4px; padding-block: 10px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+nav.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 14px; font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--muted); }
+nav.tabs button[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.tabs button:hover { color: var(--ink); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 860px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--card); border: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.intro { max-width: 68ch; margin-bottom: 16px; }
+
+/* field drawing */
+.fieldbox { background: var(--card); border: 1px solid var(--line); padding: 10px; min-width: 0; }
+svg.fieldsvg { display: block; width: 100%; height: auto; max-width: 100%; }
+.tw { fill: var(--wall); }
+.tf { fill: var(--floor); }
+.tz { fill: var(--zlow); }
+.th { fill: var(--zhigh); }
+.tp { fill: var(--zpark); }
+.cell { stroke: var(--line); stroke-width: 1; }
+.cell.clickable { cursor: crosshair; }
+.axl { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; text-anchor: middle; }
+.tl { fill: var(--ink); font-family: var(--font-mono); font-size: 11px; text-anchor: middle; }
+.cargo { fill: var(--cargo); stroke: var(--ink); stroke-width: 1.5; }
+.robot { fill: var(--accent); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+.trail { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .5; }
+.startmark { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
+.pin { fill: var(--ink); }
+.pinn { fill: var(--paper); font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-anchor: middle; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); padding-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border: 1px solid var(--line); display: inline-block; }
+.sw.tw { background: var(--wall); } .sw.tz { background: var(--zlow); } .sw.th { background: var(--zhigh); } .sw.tp { background: var(--zpark); } .sw.cg { background: var(--cargo); border-radius: 50%; }
+
+/* plan */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+th { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+td select, td input[type="number"] { background: var(--paper); border: 1px solid var(--line); padding: 5px 8px; }
+td input[type="number"] { width: 5.5em; }
+select { padding: 5px 8px; background: var(--paper); border: 1px solid var(--line); }
+textarea { width: 100%; min-height: 70px; resize: vertical; background: var(--paper); border: 1px solid var(--line); padding: 8px 10px; }
+.btn { background: var(--accent); color: var(--on-accent); border: 0; padding: 8px 16px; font-weight: 600; }
+.btn.ghost { background: none; color: var(--ink); border: 1px solid var(--line); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px 12px; flex-wrap: wrap; align-items: center; }
+.meter { height: 8px; background: var(--line); position: relative; }
+.meter > i { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
+.meter.over > i { background: var(--bad); }
+.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.totals b { display: block; font-family: var(--font-display); font-size: 26px; line-height: 1.05; }
+.warn { background: var(--bad-bg); color: var(--bad); padding: 8px 12px; font-size: 14px; }
+.note { background: var(--amber-bg); color: var(--amber); padding: 8px 12px; font-size: 14px; }
+.okbox { background: var(--good-bg); color: var(--good); padding: 8px 12px; font-size: 14px; }
+.pinlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 14px; }
+
+/* replay */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.scrub { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); }
+.stepinfo { min-height: 4.2em; }
+.stepinfo .cmd { font-family: var(--font-mono); font-weight: 500; }
+.stepinfo .bad { color: var(--bad); }
+.log { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); background: var(--paper); }
+.logrow { display: grid; grid-template-columns: 2.4em 7.5em 1fr; gap: 6px; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 8px; font-size: 13px; }
+.logrow .n { color: var(--muted); font-family: var(--font-mono); }
+.logrow .c { font-family: var(--font-mono); }
+.logrow.cur { background: var(--accent); color: var(--on-accent); }
+.logrow.cur .n { color: inherit; }
+.logrow.fail .c { color: var(--bad); }
+.logrow.cur.fail .c { color: inherit; text-decoration: underline; }
+.compare td:first-child, .compare th:first-child { padding-left: 0; }
+.compare .diff.up { color: var(--good); } .compare .diff.down { color: var(--bad); }
+.prompts { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.fields { display: grid; gap: 6px; }
+.fields input[type="number"] { background: var(--paper); border: 1px solid var(--line); padding: 8px 10px; max-width: 12em; }
+
+table.routesheet { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.routesheet th, table.routesheet td { border: 1px solid var(--line); padding: 2px 6px; text-align: left; }
+table.routesheet th { background: var(--card); font-size: 12px; }
+table.routesheet td.num { width: 2.5em; text-align: center; }
+table.routesheet select { width: 100%; min-width: 11em; font-size: 14px; padding: 2px; }
+table.routesheet tr.fail td { color: var(--bad); }
+table.routesheet input { width: 5.5em; font-size: 14px; padding: 2px 4px; }
+table.routesheet td.valcell { width: 6.5em; }
+td.rtnote { font-size: 12px; }
+ul.cmdlist { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+  var EXAMPLE = {"version":1,"field":{"width":10,"height":9,"start":[1,1],"rows":["##########","#....#..H#","#....#..H#","#....#...#","#........#","#....#...#","#....#...#","#ZZ..#PP.#","##########"]},"rules":{"maxCommands":50,"points":{"Z":10,"H":25,"P":5}},"frames":[{"cmd":"start","ok":true,"note":"The robot is on the starting tile, facing East.","x":1,"y":1,"dir":"E","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"turnLeft","ok":true,"note":"Turned left. Now facing N.","x":1,"y":1,"dir":"N","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"forward","ok":false,"note":"Bumped into a wall. The command was wasted.","x":1,"y":1,"dir":"N","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"turnRight","ok":true,"note":"Turned right. Now facing E.","x":1,"y":1,"dir":"E","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"turnRight","ok":true,"note":"Turned right. Now facing S.","x":1,"y":1,"dir":"S","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (1, 2).","x":1,"y":2,"dir":"S","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (1, 3).","x":1,"y":3,"dir":"S","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"turnLeft","ok":true,"note":"Turned left. Now facing E.","x":1,"y":3,"dir":"E","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved E to (2, 3).","x":2,"y":3,"dir":"E","carrying":false,"score":0,"cargo":[[2,3],[3,5],[7,5]]},{"cmd":"grab","ok":true,"note":"Picked up the cargo at (2, 3).","x":2,"y":3,"dir":"E","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"turnRight","ok":true,"note":"Turned right. Now facing S.","x":2,"y":3,"dir":"S","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (2, 4).","x":2,"y":4,"dir":"S","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (2, 5).","x":2,"y":5,"dir":"S","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (2, 6).","x":2,"y":6,"dir":"S","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"forward","ok":true,"note":"Moved S to (2, 7).","x":2,"y":7,"dir":"S","carrying":true,"score":0,"cargo":[[3,5],[7,5]]},{"cmd":"release","ok":true,"note":"Put the cargo down at (2, 7).","x":2,"y":7,"dir":"S","carrying":false,"score":10,"cargo":[[3,5],[7,5],[2,7]]}],"result":{"score":10,"commandsUsed":15,"low":1,"high":0,"parked":false,"ended":"finished","error":null}};
+  var KEY = 'autonomous-sandbox-v2';
+
+  var R = null;          // the replay currently shown
+  var label = '';
+  var isExample = true;
+  var idx = 0;           // current frame
+  var timer = null;
+  var speed = 500;
+  var tab = 'predict';
+  var pred = { points: '', commands: '', approach: '', locked: null };
+  var loadMsg = '';
+  var prog = [];         // the route sheet: one command name (or '') per row
+  var lastRun = null;    // frames of the last run made from the sheet, to fill x / y / facing
+  var PKEY = 'autonomous-sandbox-v2-program';
+  var LABELS = { forward: 'Move forward', backward: 'Move backward', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', grab: 'Grab cargo', release: 'Release cargo' };
+  var UNITS = { forward: 'tiles', backward: 'tiles', rotateLeft: 'degrees', rotateRight: 'degrees' };
+  var runErr = { rows: {}, list: [] };   // problems found the last time Run was pressed
+  var app = document.getElementById('app');
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  // ---------- storage (a per-viewer convenience; the page works without it) ----------
+  function readStore() {
+    try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function writeStore() {
+    try { localStorage.setItem(KEY, JSON.stringify(pred)); } catch (e) { /* ignore */ }
+  }
+
+  function writeProg() {
+    try { localStorage.setItem(PKEY, JSON.stringify(prog)); } catch (e) { /* ignore */ }
+  }
+  function readProg() {
+    try {
+      var a = JSON.parse(localStorage.getItem(PKEY) || '[]');
+      if (!Array.isArray(a)) { return []; }
+      return a.map(function (e) {
+        if (typeof e === 'string') { e = { c: e === 'turnLeft' ? 'rotateLeft' : e === 'turnRight' ? 'rotateRight' : e, v: e === 'forward' ? '1' : /^turn/.test(e) ? '90' : '' }; }
+        return e && LABELS[e.c] ? { c: e.c, v: String(e.v == null ? '' : e.v) } : { c: '', v: '' };
+      });
+    } catch (e) { return []; }
+  }
+
+  // ---------- the simulator (same rules as the Java version) ----------
+  var DNAMES = ['N', 'E', 'S', 'W'], DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  function simulate(commands, base) {
+    var F = base.field, rows = F.rows, W = F.width, H = F.height, P = base.rules.points;
+    var x = F.start[0], y = F.start[1], dir = 1, carrying = false, used = 0;
+    var cargo = base.frames[0].cargo.map(function (c) { return [c[0], c[1]]; });
+    function at(cx, cy) { return (cx < 0 || cy < 0 || cx >= W || cy >= H) ? '#' : rows[cy].charAt(cx); }
+    function find(cx, cy) { for (var i = 0; i < cargo.length; i++) { if (cargo[i][0] === cx && cargo[i][1] === cy) { return i; } } return -1; }
+    function low() { return cargo.filter(function (c) { return at(c[0], c[1]) === 'Z'; }).length; }
+    function high() { return cargo.filter(function (c) { return at(c[0], c[1]) === 'H'; }).length; }
+    function parked() { return at(x, y) === 'P'; }
+    function score() { return low() * P.Z + high() * P.H + (parked() ? P.P : 0); }
+    var frames = [];
+    function rec(cmd, ok, note) {
+      frames.push({ cmd: cmd, ok: ok, note: note, x: x, y: y, dir: DNAMES[dir], carrying: carrying, score: score(), cargo: cargo.map(function (c) { return [c[0], c[1]]; }) });
+    }
+    rec('start', true, 'The robot is on the starting tile, facing East.');
+    commands.forEach(function (cm) {
+      used++;
+      var cmd = cm.c, n = parseInt(cm.v, 10), i, name = LABELS[cmd];
+      if (cmd === 'forward' || cmd === 'backward') {
+        var d = cmd === 'forward' ? dir : (dir + 2) % 4, moved = 0;
+        while (moved < n) {
+          var nx = x + DX[d], ny = y + DY[d];
+          if (at(nx, ny) === '#') { break; }
+          x = nx; y = ny; moved++;
+        }
+        var lbl = name + ' ' + n + (n === 1 ? ' tile' : ' tiles');
+        if (moved === n) { rec(lbl, true, 'Moved ' + n + (n === 1 ? ' tile' : ' tiles') + ' ' + (cmd === 'forward' ? 'forward' : 'backward') + ' to (' + x + ', ' + y + ').'); }
+        else if (moved === 0) { rec(lbl, false, 'A wall was right there. The robot did not move, and the command was wasted.'); }
+        else { rec(lbl, false, 'Stopped after ' + moved + ' of ' + n + ' tiles because a wall was in the way. Now at (' + x + ', ' + y + ').'); }
+      } else if (cmd === 'rotateLeft') { dir = (dir + 4 - (n / 90) % 4) % 4; rec(name + ' ' + n + '\u00b0', true, 'Rotated left ' + n + '\u00b0. Now facing ' + DNAMES[dir] + '.'); }
+      else if (cmd === 'rotateRight') { dir = (dir + n / 90) % 4; rec(name + ' ' + n + '\u00b0', true, 'Rotated right ' + n + '\u00b0. Now facing ' + DNAMES[dir] + '.'); }
+      else if (cmd === 'grab') {
+        if (carrying) { rec(name, false, 'Already carrying cargo. The robot can hold only one piece.'); }
+        else if ((i = find(x, y)) < 0) { rec(name, false, 'Nothing to grab on this tile.'); }
+        else { cargo.splice(i, 1); carrying = true; rec(name, true, 'Picked up the cargo at (' + x + ', ' + y + ').'); }
+      } else if (cmd === 'release') {
+        if (!carrying) { rec(name, false, 'The robot is not carrying anything.'); }
+        else if (find(x, y) >= 0) { rec(name, false, 'There is already cargo on this tile. Only one piece fits per tile.'); }
+        else { cargo.push([x, y]); carrying = false; rec(name, true, 'Put the cargo down at (' + x + ', ' + y + ').'); }
+      }
+    });
+    return { version: 1, field: F, rules: base.rules, frames: frames,
+      result: { score: score(), commandsUsed: used, low: low(), high: high(), parked: parked(), ended: 'finished', error: null } };
+  }
+
+  // ---------- replay handling ----------
+  function valid(o) {
+    return o && o.field && Array.isArray(o.field.rows) && o.field.rows.length > 0 &&
+      Array.isArray(o.frames) && o.frames.length > 0 && o.rules && o.rules.points && o.result;
+  }
+  function setReplay(obj, name, example) {
+    if (!valid(obj)) { loadMsg = 'That file does not look like a replay.json from the sandbox. Run the simulator and open the replay.json it writes.'; render(); return; }
+    stop();
+    loadMsg = '';
+    R = obj; label = name; isExample = example; idx = 0;
+    if (!example) { tab = 'replay'; }
+    render();
+  }
+
+  // ---------- drawing ----------
+  var S = 44, M = 24;
+  var DIRANG = { N: 0, E: 90, S: 180, W: 270 };
+  function tileName(ch) {
+    return ch === '#' ? 'wall' : ch === 'Z' ? 'low zone (+' + R.rules.points.Z + ')' : ch === 'H' ? 'high zone (+' + R.rules.points.H + ')' : ch === 'P' ? 'parking (+' + R.rules.points.P + ')' : 'floor';
+  }
+  function fieldSvg(o) {
+    var F = R.field, W = F.width, H = F.height, x, y, out;
+    out = '<svg class="fieldsvg" viewBox="0 0 ' + (W * S + M + 4) + ' ' + (H * S + M + 4) + '" role="img" aria-label="' + esc(o.aria) + '">';
+    for (x = 0; x < W; x++) { out += '<text class="axl" x="' + (M + x * S + S / 2) + '" y="15">' + x + '</text>'; }
+    for (y = 0; y < H; y++) { out += '<text class="axl" x="10" y="' + (M + y * S + S / 2 + 4) + '">' + y + '</text>'; }
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        var ch = F.rows[y].charAt(x);
+        var cls = ch === '#' ? 'tw' : ch === 'Z' ? 'tz' : ch === 'H' ? 'th' : ch === 'P' ? 'tp' : 'tf';
+        out += '<rect class="cell ' + cls + '" x="' + (M + x * S) + '" y="' + (M + y * S) + '" width="' + S + '" height="' + S + '"><title>(' + x + ', ' + y + ') ' + tileName(ch) + '</title></rect>';
+        if (ch === 'Z' || ch === 'H' || ch === 'P') {
+          var txt = ch === 'P' ? 'P +' + R.rules.points.P : '+' + R.rules.points[ch];
+          out += '<text class="tl" pointer-events="none" x="' + (M + x * S + S / 2) + '" y="' + (M + y * S + S - 7) + '">' + txt + '</text>';
+        }
+      }
+    }
+    if (o.trail && o.trail.length > 1) {
+      var pts = o.trail.map(function (p) { return (M + p[0] * S + S / 2) + ',' + (M + p[1] * S + S / 2); }).join(' ');
+      out += '<polyline class="trail" pointer-events="none" points="' + pts + '"/>';
+    }
+    var st = F.start || [R.frames[0].x, R.frames[0].y];
+    out += '<rect class="startmark" pointer-events="none" x="' + (M + st[0] * S + 3) + '" y="' + (M + st[1] * S + 3) + '" width="' + (S - 6) + '" height="' + (S - 6) + '"/>';
+    o.cargo.forEach(function (c) {
+      out += '<circle class="cargo" pointer-events="none" cx="' + (M + c[0] * S + S / 2) + '" cy="' + (M + c[1] * S + S / 2) + '" r="9"/>';
+    });
+    var f = o.frame;
+    var rx = M + f.x * S + S / 2, ry = M + f.y * S + S / 2;
+    out += '<g pointer-events="none" transform="translate(' + rx + ',' + ry + ') rotate(' + DIRANG[f.dir] + ')">' +
+      '<polygon class="robot" points="0,-17 13,14 0,8 -13,14"/>' +
+      (f.carrying ? '<circle class="cargo" cx="0" cy="3" r="6"/>' : '') + '</g>';
+    return out + '</svg>';
+  }
+  function legend() {
+    return '<div class="legend"><span><i class="sw tz"></i>low zone</span><span><i class="sw th"></i>high zone</span><span><i class="sw tp"></i>parking</span><span><i class="sw tw"></i>wall</span><span><i class="sw cg"></i>cargo</span><span>Dashed square: start tile</span></div>';
+  }
+
+  // ---------- page parts ----------
+  function head() {
+    var f = R.frames[idx];
+    var stats = tab === 'replay'
+      ? '<div class="tb-stat"><span class="label">Score now</span><b class="num" id="st-score">' + f.score + '</b></div>' +
+        '<div class="tb-stat"><span class="label">Commands</span><b class="num" id="st-cmd">' + idx + ' / ' + R.rules.maxCommands + '</b></div>'
+      : '<div class="tb-stat"><span class="label">Budget</span><b class="num">' + R.rules.maxCommands + '</b></div>' +
+        '<div class="tb-stat"><span class="label">Cargo</span><b class="num">' + R.frames[0].cargo.length + '</b></div>';
+    return '<header class="titleblock"><div><h1>Autonomous Sandbox</h1>' +
+      '<div class="sub">Plan on paper first. Then predict, simulate, and compare what happened with what you expected.</div></div>' +
+      '<div class="tb-stats">' + stats + '</div></header>';
+  }
+  function loader() {
+    return '<div class="bar-row"><label class="filebtn">Open replay.json<input type="file" id="file" accept=".json,application/json"></label>' +
+      '<div class="source">' + (isExample ? '<span class="pill demo">Demo</span>Showing a made-up demo run, not a model answer. Open your own replay.json, or drop it anywhere on this page.' :
+        '<span class="pill live">Your run</span>' + esc(label)) + '</div>' +
+      (loadMsg ? '<div class="msg" role="alert">' + esc(loadMsg) + '</div>' : '') + '</div>';
+  }
+  function tabs() {
+    return '<nav class="tabs" aria-label="Sections"><button data-tab="predict"' + (tab === 'predict' ? ' aria-current="page"' : '') + '>Prediction</button>' +
+      '<button data-tab="program"' + (tab === 'program' ? ' aria-current="page"' : '') + '>Program</button>' +
+      '<button data-tab="replay"' + (tab === 'replay' ? ' aria-current="page"' : '') + '>Replay</button></nav>';
+  }
+
+  function programView() {
+    var max = R.rules.maxCommands, i, rowsHtml = '', used = 0, fi = 0;
+    while (prog.length < max) { prog.push({ c: '', v: '' }); }
+    prog.length = max;
+    var f0 = R.frames[0];
+    for (i = 0; i < max; i++) { if (prog[i].c) { used++; } }
+    for (i = 0; i < max; i++) {
+      var e = prog[i], fr = null, cls = '';
+      if (e.c) { fi++; if (lastRun && lastRun.frames[fi]) { fr = lastRun.frames[fi]; cls = fr.ok ? '' : ' fail'; } }
+      if (runErr.rows[i]) { cls = ' fail'; }
+      var opts = '<option value="">-</option>';
+      Object.keys(LABELS).forEach(function (k) { opts += '<option value="' + k + '"' + (k === e.c ? ' selected' : '') + '>' + LABELS[k] + '</option>'; });
+      var val = UNITS[e.c] ? '<input type="number" min="1" step="' + (e.c === 'forward' || e.c === 'backward' ? 1 : 90) + '" inputmode="numeric" data-val="' + i + '" value="' + esc(e.v) + '" placeholder="' + UNITS[e.c] + '" aria-label="Row ' + (i + 1) + ' ' + UNITS[e.c] + '">' : '';
+      rowsHtml += '<tr class="rt' + cls + '"><td class="num">' + (i + 1) + '</td><td><select data-row="' + i + '" aria-label="Command ' + (i + 1) + '">' + opts + '</select></td>' +
+        '<td class="valcell">' + val + '</td>' +
+        '<td class="num res">' + (fr ? fr.x : '') + '</td><td class="num res">' + (fr ? fr.y : '') + '</td><td class="num res">' + (fr ? fr.dir : '') + '</td>' +
+        '<td class="rtnote res">' + (fr && !fr.ok ? esc(fr.note) : '') + '</td></tr>';
+    }
+    var errHtml = runErr.list.length ? '<div class="warn" role="alert">Fix these rows before running:<br>' + runErr.list.map(esc).join('<br>') + '</div>' : '';
+    return '<p class="intro">This is your Route Sheet, on screen. Fill it in the same way as the paper one: one command per row, in order. Row 1 runs first. The robot starts on the dashed tile facing East, and you have ' + max + ' rows. Each row is one command, however far it moves or turns. When you press Run, the x, y and Facing columns fill in so you can check them against your paper tracking.</p>' +
+      '<div class="cols"><div class="stack"><div class="fieldbox">' + fieldSvg({ frame: f0, cargo: f0.cargo, aria: 'The playing field at the start' }) + legend() + '</div>' +
+      '<div class="panel"><h3>The commands</h3><ul class="cmdlist"><li><b>Move forward / backward</b>: enter a number of tiles. Backward goes the opposite way without turning. A wall stops the robot.</li><li><b>Rotate left / right</b>: enter degrees, in 90s for now (90, 180, 270, 360).</li><li><b>Grab cargo</b> picks up cargo on the robot’s tile.</li><li><b>Release cargo</b> puts it down on the robot’s tile.</li></ul></div></div>' +
+      '<div class="stack"><div class="panel"><div class="row"><b class="num">' + used + ' / ' + max + '</b> rows used' +
+      '<button class="btn" data-run="1"' + (used ? '' : ' disabled') + '>Run on the field</button><button class="btn ghost" data-clear="1">Clear the sheet</button></div>' +
+      errHtml + (lastRun ? '<div class="muted" id="lastrun">Last run: ' + lastRun.result.score + ' points. Rows in red did not go as written.</div>' : '') +
+      '</div><div class="panel tablewrap"><table class="routesheet"><thead><tr><th>#</th><th>Command</th><th>Tiles / degrees</th><th>x</th><th>y</th><th>Facing</th><th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div></div>';
+  }
+
+  function predictView() {
+    var f0 = R.frames[0];
+    var locked = pred.locked;
+    var d = locked ? ' disabled' : '';
+    var form = '<div class="panel"><h3>Your prediction</h3>' +
+      '<p class="muted">Use the plan on your engineering paper. Count what you expect to score and how many commands you expect to use, then lock it in before you run your code.</p>' +
+      '<div class="fields"><label class="label" for="pp">Predicted points</label><input type="number" id="pp" min="0" step="1" inputmode="numeric" value="' + esc(pred.points) + '"' + d + '>' +
+      '<label class="label" for="pc">Predicted commands used (budget ' + R.rules.maxCommands + ')</label><input type="number" id="pc" min="0" step="1" inputmode="numeric" value="' + esc(pred.commands) + '"' + d + '></div>' +
+      '<label class="label" for="approach">Your approach in a sentence or two</label><textarea id="approach"' + d + '>' + esc(pred.approach) + '</textarea>';
+    if (locked) {
+      form += '<div class="okbox">Locked: ' + locked.points + ' points in ' + locked.commands + ' commands. Now go to the Program tab and run your route, then compare.</div>' +
+        '<div class="row"><button class="btn ghost" data-unlock="1">Unlock and edit</button></div>';
+    } else {
+      form += '<div id="lockmsg"></div><div class="row"><button class="btn" data-lock="1">Lock my prediction</button></div>';
+    }
+    form += '</div>';
+    return '<p class="intro">This is the second step. First, plan your autonomous run on engineering paper and fill in the paper Route Sheet. Record your prediction here, then copy your route onto the Program tab and run it. The replay shows what the robot really did, and the comparison shows where the plan and reality differ.</p>' +
+      '<div class="cols"><div class="stack"><div class="fieldbox">' + fieldSvg({ frame: f0, cargo: f0.cargo, aria: 'The playing field at the start' }) + legend() + '</div></div>' +
+      '<div class="stack">' + form + '</div></div>';
+  }
+
+  function counts(f) {
+    var z = 0, h = 0;
+    f.cargo.forEach(function (c) { var ch = R.field.rows[c[1]].charAt(c[0]); if (ch === 'Z') { z++; } else if (ch === 'H') { h++; } });
+    return { z: z, h: h, park: R.field.rows[f.y].charAt(f.x) === 'P' };
+  }
+  function replayView() {
+    var n = R.frames.length - 1;
+    return '<div class="cols"><div class="stack"><div class="fieldbox"><div id="fieldwrap"></div>' + legend() + '</div>' +
+      '<div class="controls"><button class="btn ghost" data-act="restart">Restart</button><button class="btn ghost" data-act="back">Back</button>' +
+      '<button class="btn" id="playbtn" data-act="play">Play</button><button class="btn ghost" data-act="step">Step</button>' +
+      '<label class="label" for="speed">Speed</label><select id="speed"><option value="900">Slow</option><option value="500">Normal</option><option value="200">Fast</option></select>' +
+      '<input class="scrub" id="scrub" type="range" min="0" max="' + n + '" value="' + idx + '" aria-label="Step"></div></div>' +
+      '<div class="stack"><div class="panel"><div class="stepinfo" id="stepinfo" aria-live="polite"></div><div id="breakdown"></div></div>' +
+      '<div class="panel"><h3>Command log</h3><div class="log" id="log"></div></div>' +
+      '<div id="compare"></div></div></div>';
+  }
+  function updateReplay() {
+    var f = R.frames[idx], i;
+    var trail = [];
+    for (i = 0; i <= idx; i++) { trail.push([R.frames[i].x, R.frames[i].y]); }
+    $('fieldwrap').innerHTML = fieldSvg({ frame: f, cargo: f.cargo, trail: trail, aria: 'Field at step ' + idx + ' of ' + (R.frames.length - 1) });
+    var pr = R.rules.points, c = counts(f);
+    $('stepinfo').innerHTML = '<div class="label">Step ' + idx + ' of ' + (R.frames.length - 1) + '</div>' +
+      '<div><span class="cmd' + (f.ok ? '' : ' bad') + '">' + esc(f.cmd) + '</span>' + (f.ok ? '' : ' <span class="pill" style="color:var(--bad)">wasted</span>') + '</div>' +
+      '<div class="' + (f.ok ? '' : 'bad') + '">' + esc(f.note) + '</div>';
+    $('breakdown').innerHTML = '<div class="totals" style="margin-top:6px"><div><span class="label">Low zones</span><b class="num">' + c.z + ' x ' + pr.Z + '</b></div>' +
+      '<div><span class="label">High zones</span><b class="num">' + c.h + ' x ' + pr.H + '</b></div>' +
+      '<div><span class="label">Parked</span><b class="num">' + (c.park ? '+' + pr.P : 'no') + '</b></div></div>';
+    var log = '';
+    R.frames.forEach(function (fr, k) {
+      log += '<button class="logrow' + (k === idx ? ' cur' : '') + (fr.ok ? '' : ' fail') + '" data-i="' + k + '"><span class="n">' + k + '</span><span class="c">' + esc(fr.cmd) + '</span><span>' + esc(fr.note) + '</span></button>';
+    });
+    var lg = $('log');
+    lg.innerHTML = log;
+    var cur = lg.querySelector('.cur');
+    if (cur) { lg.scrollTop = Math.max(0, cur.offsetTop - lg.clientHeight / 2); }
+    $('scrub').value = idx;
+    $('playbtn').textContent = timer ? 'Pause' : 'Play';
+    var sc = $('st-score'), sm = $('st-cmd');
+    if (sc) { sc.textContent = f.score; }
+    if (sm) { sm.textContent = idx + ' / ' + R.rules.maxCommands; }
+    $('compare').innerHTML = idx === R.frames.length - 1 ? resultHtml() : '';
+  }
+  function resultHtml() {
+    var res = R.result, out = '<div class="panel"><h3>Result</h3>';
+    var ended = res.ended === 'out_of_commands' ? 'The robot used all of its commands, so the run ended there.' :
+      res.ended === 'finished' ? 'The strategy finished on its own.' : '';
+    if (ended) { out += '<p>' + ended + '</p>'; }
+    if (res.error) { out += '<div class="warn">' + esc(res.error) + '</div>'; }
+    out += '<p>Final score <b class="num">' + res.score + '</b> using <b class="num">' + res.commandsUsed + '</b> of ' + R.rules.maxCommands + ' commands.</p>';
+    if (isExample) {
+      out += '<p class="muted">This is the demo run. Open your own replay.json to compare it with your prediction.</p>';
+    } else if (pred.locked) {
+      var pl = pred.locked;
+      var dp = res.score - pl.points, dc = res.commandsUsed - pl.commands;
+      out += '<table class="compare"><thead><tr><th></th><th>Predicted</th><th>Actual</th><th>Difference</th></tr></thead><tbody>' +
+        '<tr><td>Points</td><td class="num">' + pl.points + '</td><td class="num">' + res.score + '</td><td class="num diff ' + (dp >= 0 ? 'up' : 'down') + '">' + (dp > 0 ? '+' : '') + dp + '</td></tr>' +
+        '<tr><td>Commands</td><td class="num">' + pl.commands + '</td><td class="num">' + res.commandsUsed + '</td><td class="num diff ' + (dc <= 0 ? 'up' : 'down') + '">' + (dc > 0 ? '+' : '') + dc + '</td></tr></tbody></table>' +
+        '<h3>Think it through</h3><ol class="prompts"><li>Which part of the plan differed most from what the robot did, and why?</li><li>Did a wall, a turn, or a wasted command cost more than you expected?</li><li>Go back to your paper. What would you change in the plan itself?</li></ol>';
+    } else {
+      out += '<div class="note">You did not lock a prediction before this run. Next time, record one on the Prediction tab first, so you can see how close the plan was.</div>';
+    }
+    return out + '</div>';
+  }
+
+  // ---------- playback ----------
+  function stop() { if (timer) { clearTimeout(timer); timer = null; } }
+  function tick() {
+    if (idx >= R.frames.length - 1) { stop(); updateReplay(); return; }
+    idx++;
+    if (idx >= R.frames.length - 1) { stop(); updateReplay(); return; }
+    updateReplay();
+    timer = setTimeout(tick, speed);
+  }
+  function play() {
+    if (timer) { stop(); updateReplay(); return; }
+    if (idx >= R.frames.length - 1) { idx = 0; }
+    timer = setTimeout(tick, 0);
+    updateReplay();
+  }
+
+  // ---------- render ----------
+  function render() {
+    if (!R) { return; }
+    app.innerHTML = head() + loader() + tabs() + (tab === 'predict' ? predictView() : tab === 'program' ? programView() : replayView());
+    if (tab === 'replay') { $('speed').value = String(speed); updateReplay(); }
+  }
+
+  // ---------- events ----------
+  app.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tab],[data-act],[data-i],[data-lock],[data-unlock],[data-run],[data-clear]');
+    if (!t || !app.contains(t)) { return; }
+    if (t.dataset.tab) { stop(); tab = t.dataset.tab; render(); return; }
+    if (t.dataset.act) {
+      var a = t.dataset.act;
+      if (a === 'play') { play(); return; }
+      stop();
+      if (a === 'restart') { idx = 0; } else if (a === 'back') { idx = Math.max(0, idx - 1); } else if (a === 'step') { idx = Math.min(R.frames.length - 1, idx + 1); }
+      updateReplay(); return;
+    }
+    if (t.dataset.i !== undefined) { stop(); idx = +t.dataset.i; updateReplay(); return; }
+    if (t.dataset.lock) {
+      var p = parseFloat(pred.points), c = parseFloat(pred.commands);
+      if (isNaN(p) || isNaN(c) || p < 0 || c < 0) {
+        $('lockmsg').innerHTML = '<div class="warn">Fill in both numbers before locking.</div>';
+        return;
+      }
+      pred.locked = { points: p, commands: c, approach: pred.approach };
+      writeStore(); render(); return;
+    }
+    if (t.dataset.clear) { prog = []; lastRun = null; runErr = { rows: {}, list: [] }; writeProg(); render(); return; }
+    if (t.dataset.run) {
+      var cmds = [], errs = { rows: {}, list: [] };
+      prog.forEach(function (e, ix) {
+        if (!e.c) { return; }
+        if (UNITS[e.c]) {
+          var n = Number(e.v);
+          var isRot = UNITS[e.c] === 'degrees';
+          if (e.v === '' || !isFinite(n) || n < 1 || Math.floor(n) !== n) { errs.rows[ix] = 1; errs.list.push('Row ' + (ix + 1) + ': enter a whole number of ' + UNITS[e.c] + '.'); return; }
+          if (isRot && (n % 90 !== 0 || n > 360)) { errs.rows[ix] = 1; errs.list.push('Row ' + (ix + 1) + ': this version turns in 90\u00b0 steps (90, 180, 270 or 360).'); return; }
+        }
+        cmds.push(e);
+      });
+      runErr = errs;
+      if (errs.list.length) { lastRun = null; render(); return; }
+      if (!cmds.length) { return; }
+      var rp = simulate(cmds, R);
+      lastRun = rp;
+      setReplay(rp, 'Built on the Program tab', false);
+      return;
+    }
+    if (t.dataset.unlock) { pred.locked = null; writeStore(); render(); return; }
+  });
+  app.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'file') { readFile(t.files && t.files[0]); return; }
+    if (t.id === 'speed') { speed = +t.value; }
+    if (t.dataset && t.dataset.row !== undefined) {
+      var ri = +t.dataset.row;
+      prog[ri] = { c: t.value, v: '' };
+      lastRun = null; runErr = { rows: {}, list: [] }; writeProg(); render();
+      var tgt = app.querySelector('input[data-val="' + ri + '"]') || app.querySelector('select[data-row="' + Math.min(prog.length - 1, ri + 1) + '"]');
+      if (tgt) { tgt.focus(); }
+    }
+  });
+  app.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.id === 'pp') { pred.points = t.value; writeStore(); }
+    else if (t.id === 'pc') { pred.commands = t.value; writeStore(); }
+    else if (t.id === 'approach') { pred.approach = t.value; writeStore(); }
+    else if (t.dataset && t.dataset.val !== undefined) {
+      prog[+t.dataset.val].v = t.value; writeProg();
+      lastRun = null;
+      var cells = app.querySelectorAll('td.res'); for (var q = 0; q < cells.length; q++) { cells[q].textContent = ''; }
+      var lr = $('lastrun'); if (lr) { lr.textContent = 'Edited since the last run. Press Run to update.'; }
+    }
+    else if (t.id === 'scrub') { stop(); idx = +t.value; updateReplay(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (tab !== 'replay' || !R) { return; }
+    var tg = e.target && e.target.tagName;
+    if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') { return; }
+    if (e.key === 'ArrowRight') { stop(); idx = Math.min(R.frames.length - 1, idx + 1); updateReplay(); }
+    else if (e.key === 'ArrowLeft') { stop(); idx = Math.max(0, idx - 1); updateReplay(); }
+  });
+
+  function readFile(file) {
+    if (!file) { return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var obj = null;
+      try { obj = JSON.parse(String(rd.result)); } catch (err) { obj = null; }
+      setReplay(obj, file.name, false);
+    };
+    rd.onerror = function () { loadMsg = 'That file could not be read.'; render(); };
+    rd.readAsText(file);
+  }
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) { readFile(f); }
+  });
+
+  prog = readProg();
+  var saved = readStore();
+  if (saved) {
+    pred = { points: saved.points || '', commands: saved.commands || '', approach: saved.approach || '', locked: saved.locked || null };
+  }
+  setReplay(EXAMPLE, 'demo', true);
+})();
+</script>
